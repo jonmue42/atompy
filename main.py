@@ -4,23 +4,7 @@ from hartree_fock.scf import scf_hf
 import typing
 import numpy as np 
 
-from pyscf import gto
-
-
-#define a STO-3G basis set for 1s of H
-#alpha values for STO-3G: 0.3425250914E+01, 0.6239137298E+00, 0.1688554040E+00
-#coeff values for STO-3G: 0.1543289673E+00, 0.5353281423E+00, 0.4446345422E+00
-
-STO_3G = GaussianBasis([0.3425250914E+01, 0.6239137298E+00, 0.1688554040E+00], [0.1543289673E+00, 0.5353281423E+00, 0.4446345422E+00], 0)
-
-H1_atom = atom.atom(1, [0.0, 0.0, 0.0], orbs=['1s'], basis_sets=[STO_3G])
-H2_atom = atom.atom(1, [0.0, 0.0, 0.74], orbs=['1s'], basis_sets=[STO_3G])
-
-molecule = molecule.molecule([H1_atom, H2_atom])
-print(molecule.atomic_orbs)
-print(molecule.basic_sets)
-print(molecule.overlap())
-
+from pyscf import gto, scf
 
 #Basic program structure:
 # define basis sets for the atoms
@@ -34,9 +18,36 @@ print(H2.atom_coords())
 scf = scf_hf(H2)
 
 initial_guess = np.zeros((scf.Nbas, scf.Nbas))
-energy, c = scf(initial_guess, tol=1e-200, max_iter=1000)
+energy, c, total_energy = scf(initial_guess, tol=1E-10, max_iter=100000000000)
 
 print('Energy')
 print(energy)
 print('total energy')
-print(np.sum(energy))
+print(total_energy + H2.energy_nuc())
+
+
+#
+#CO = gto.M(atom='C 0 0 0; O 0 0 2.132', basis='sto-3g', unit='Bohr')
+#scf = scf_hf(CO)
+#initial_guess = np.zeros((scf.Nbas, scf.Nbas))
+#energy, c, total_energy = scf(initial_guess, tol=1e-10, max_iter=1000)
+#print('Energy')
+#print(energy)
+#print('total electronic energy')
+#print(total_energy)
+#print('total energy')
+#print(total_energy + CO.energy_nuc())
+#
+
+
+#N2 = gto.M(atom='N 0 0 0; N 0 0 2.074', basis='sto-3g', unit='Bohr')
+#
+#scf = scf_hf(N2)
+#initial_guess = np.zeros((scf.Nbas, scf.Nbas))
+#energy, c, total_energy = scf(initial_guess, tol=1e-200, max_iter=1000)
+#print('Energy')
+#print(energy)
+#print('total electronic energy')
+#print(total_energy)
+#print('total energy')
+#print(total_energy + N2.energy_nuc())
