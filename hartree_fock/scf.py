@@ -11,6 +11,9 @@ class RHF():
         self.nuclear = molecule.intor('int1e_nuc')
         self.Hcore = self.kinetic + self.nuclear
         self.two_electron = molecule.intor('int2e')
+        print('Initialized RHF')
+        print('Overlap')
+        print(self.overlap)
 
     def __call__(self, initial_c, tol, max_iter):
         density = self._density(initial_c)
