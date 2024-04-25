@@ -12,33 +12,35 @@ from pyscf import gto, scf
 # calculate the overlap matrix etc.
 # perform the SCF calculation
 
-H2 = gto.M(atom='H 0 0 0; H 0 0 1.4', basis='sto-3g', unit='Bohr')
+H2 = gto.M(atom='H 0 0 0; H 0 0 1.4', basis='sto-6g', unit='Bohr')
 print(H2.atom_coords())
 
 scf = RHF(H2)
 
 initial_guess = np.zeros((scf.Nbas, scf.Nbas))
-energy, c = scf(initial_guess, tol=1E-10, max_iter=100000000000)
+energy, c, total_elec_energy = scf(initial_guess, tol=1E-10, max_iter=100000000000)
 
 print('Energy')
 print(energy)
 print('c')
 print(c)
-#print('total energy')
-#print(total_energy + H2.energy_nuc())
-
+print('total electronic energy')
+print(total_elec_energy)
+print('total energy')
+print(total_elec_energy + H2.energy_nuc())
 
 #
+#
 #CO = gto.M(atom='C 0 0 0; O 0 0 2.132', basis='sto-3g', unit='Bohr')
-#scf = scf_hf(CO)
+#scf = RHF(CO)
 #initial_guess = np.zeros((scf.Nbas, scf.Nbas))
-#energy, c, total_energy = scf(initial_guess, tol=1e-10, max_iter=1000)
+#energy, c, total_elec_energy = scf(initial_guess, tol=1e-10, max_iter=1000)
 #print('Energy')
 #print(energy)
 #print('total electronic energy')
-#print(total_energy)
+#print(total_elec_energy)
 #print('total energy')
-#print(total_energy + CO.energy_nuc())
+#print(total_elec_energy + CO.energy_nuc())
 #
 
 

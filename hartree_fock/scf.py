@@ -21,7 +21,8 @@ class RHF():
             if np.allclose(energy, energy_new, atol=tol, rtol=0.0):
                 print('Converged')
                 density = self._density(c_new)
-                return energy_new, c_new
+                total_elec_energy = self._total_elec_energy(density, self._Fock(density))
+                return energy_new, c_new, total_elec_energy
             else:
                 energy = energy_new
                 c = c_new
@@ -54,6 +55,16 @@ class RHF():
                 for k in range(int(self.Nbas/2)):
                     density[i, j] += 2 * c[i, k] * c[j, k]
         return density
+    
+    def _total_elec_energy(self, density, Fock):
+        total_elec_energy = 0
+        for i in range(self.Nbas):
+            for j in range(self.Nbas):
+                total_elec_energy += 0.5 * density[i, j] * (self.Hcore[j, i] + Fock[j, i])
+        return total_elec_energy
+
+    def _total_energy(self):
+        return 0
 
 
 
