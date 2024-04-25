@@ -1,6 +1,6 @@
 from basis_sets.gaussian import GaussianBasis
 from structure import atom, molecule
-from hartree_fock.scf import scf_hf
+from hartree_fock.scf import scf_hf, RHF
 import typing
 import numpy as np 
 
@@ -15,15 +15,17 @@ from pyscf import gto, scf
 H2 = gto.M(atom='H 0 0 0; H 0 0 1.4', basis='sto-3g', unit='Bohr')
 print(H2.atom_coords())
 
-scf = scf_hf(H2)
+scf = RHF(H2)
 
 initial_guess = np.zeros((scf.Nbas, scf.Nbas))
-energy, c, total_energy = scf(initial_guess, tol=1E-10, max_iter=100000000000)
+energy, c = scf(initial_guess, tol=1E-10, max_iter=100000000000)
 
 print('Energy')
 print(energy)
-print('total energy')
-print(total_energy + H2.energy_nuc())
+print('c')
+print(c)
+#print('total energy')
+#print(total_energy + H2.energy_nuc())
 
 
 #
