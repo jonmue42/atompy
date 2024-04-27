@@ -33,6 +33,10 @@ class RHF():
                 energy = energy_new
                 c = c_new
         print('Did not converge')
+        density = self._density(c)
+        total_elec_energy = self._total_elec_energy(density, self._Fock(density))
+        return energy, c, total_elec_energy
+
 
     def _calculate_cycle(self, c, S):
         density = self._density(c)
