@@ -1,10 +1,45 @@
 from basis_sets.gaussian import GaussianBasis
 from structure import atom, molecule
 from hartree_fock.scf import RHF
+from dft import scf
 import typing
 import numpy as np 
 
-from pyscf import gto, scf
+from pyscf import gto, scf, dft
+
+from pyscf.dft.libxc import eval_xc
+from pyscf.dft import numint
+
+#DFT
+
+
+
+##############################################################
+#hartree_fock:
+
+#H20 = gto.M(atom='O 0 0 0; H 0 0 1.809; H 1.809 0 0', basis='sto-3g', unit='Bohr')
+#mf = dft.RKS(H20)
+#mf.xc = 'LDA'
+#mf = mf.newton()
+#mf.kernel()
+#
+print(eval_xc('LDA', np.array([0.1, 0.4])))
+print(eval_xc('LDA', np.array([0.1, 0.4]))[1][0] * [2, 2])
+
+#print(eval_xc('LDA', np.array([0.1])))
+#print(eval_xc('LDA', np.array([0.4])))
+#
+#mol = gto.M(atom='O 0 0 0', basis='sto-3g', unit='Bohr')
+#grid = dft.gen_grid.Grids(mol)
+#grid.build(with_non0tab=True)
+#print(grid.coords)
+#coords = np.random.random((4, 3))
+#iny = numint.eval_ao(mol, coords, deriv=0)
+#print(coords)
+#print(iny)
+
+#density = numint.eval_rho(mol, iny, mol.make_rdm1())
+
 
 #Basic program structure:
 # define basis sets for the atoms
@@ -69,19 +104,19 @@ from pyscf import gto, scf
 #print(total_energy)
 #print('total energy')
 #print(total_energy + N2.energy_nuc())
-
-H2O = gto.M(atom='O 0 0 0; H 0 0 1.809; H 1.809 0 0', basis='sto-3g', unit='Bohr')
-scf = RHF(H2O)
-print('Nbas')
-print(scf.Nbas)
-print('overlapp')
-print(scf.overlap)
-initial_guess = np.zeros((scf.Nbas, scf.Nbas))
-energy, c, total_elec_energy = scf(initial_guess, tol=1e-10, max_iter=1000)
-print('Energy')
-print(energy)
-print('total electronic energy')
-print(total_elec_energy)
-print('total energy')
-print(total_elec_energy + H2O.energy_nuc())
-
+#
+#H2O = gto.M(atom='O 0 0 0; H 0 0 1.809; H 1.809 0 0', basis='sto-3g', unit='Bohr')
+#scf = RHF(H2O)
+#print('Nbas')
+#print(scf.Nbas)
+#print('overlapp')
+#print(scf.overlap)
+#initial_guess = np.zeros((scf.Nbas, scf.Nbas))
+#energy, c, total_elec_energy = scf(initial_guess, tol=1e-10, max_iter=1000)
+#print('Energy')
+#print(energy)
+#print('total electronic energy')
+#print(total_elec_energy)
+#print('total energy')
+#print(total_elec_energy + H2O.energy_nuc())
+#
