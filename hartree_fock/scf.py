@@ -83,7 +83,3 @@ class RHF():
 
     def _total_energy(self):
         return 0
-
-
-
-

@@ -1,7 +1,7 @@
 from basis_sets.gaussian import GaussianBasis
 from structure import atom, molecule
 from hartree_fock.scf import RHF
-from dft import scf
+from dft.scf import RKSDFT
 import typing
 import numpy as np 
 
@@ -12,6 +12,15 @@ from pyscf.dft import numint
 
 #DFT
 
+H20 = gto.M(atom='O 0 0 0; H 0 0 1.809; H 1.809 0 0', basis='sto-3g', unit='Bohr')
+grid = dft.gen_grid.Grids(H20)
+grid.build(with_non0tab=True)
+print(grid.coords)
+DFT_scf = RKSDFT(H20, grid=grid.coords)
+initial_c = np.zeros((DFT_scf.Nbas, DFT_scf.Nbas))
+DF_energy, DF_KSwave = DFT_scf(initial_c=initial_c, tol=1E-1, max_iter=10)
+print('Energy')
+print(DF_energy)
 
 
 ##############################################################
@@ -23,8 +32,8 @@ from pyscf.dft import numint
 #mf = mf.newton()
 #mf.kernel()
 #
-print(eval_xc('LDA', np.array([0.1, 0.4])))
-print(eval_xc('LDA', np.array([0.1, 0.4]))[1][0] * [2, 2])
+#print(eval_xc('LDA', np.array([0.1, 0.4])))
+#print(eval_xc('LDA', np.array([0.1, 0.4]))[1][0] * [2, 2])
 
 #print(eval_xc('LDA', np.array([0.1])))
 #print(eval_xc('LDA', np.array([0.4])))

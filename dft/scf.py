@@ -4,10 +4,15 @@ from scipy.linalg import eigh
 from pyscf.dft import libxc
 from pyscf.dft import numint
 
+#TODO total electronic energy, total energy 
+
 class RKSDFT():
-    def __init__(self, molecule):
+    def __init__(self, molecule, grid):
+        self.grid = grid
+
         self.molecule = molecule
         self.Nbas = molecule.nao
+        self.nelectron = molecule.nelectron
 
         self.overlap = molecule.intor('int1e_ovlp')
         self.kinetic = molecule.intor('int1e_kin')
@@ -16,9 +21,36 @@ class RKSDFT():
 
         self.two_electron = molecule.intor('int2e')
 
-    def _calculate_cycle(self, Fock, KSwave):
+    def __call__(self, initial_c, tol, max_iter):
+        # perform a first cycle of scf
+        energy, KSwave = self._calculate_cycle(self.overlap, initial_c)
+        for iteration in range(max_iter):
+            energy_new, KSwave_new = self._calculate_cycle(self.overlap, KSwave)
+            if np.allclose(energy, energy_new, atol=tol, rtol=0.0) and np.allclose(KSwave, KSwave_new, atol=tol, rtol=0.0):
+                print('Converged')
+                return energy_new, KSwave_new
+            else:
+                energy = energy_new
+                KSwave = KSwave_new
+        print('Did not converge')
+
+    def _calculate_cycle(self, overlap, KSwave):
         """perfrom single cycle of scf
         """
+        # get the initial density matrix
+        density_matrix = self._density_coeff(KSwave)
+        print('Density matrix')
+        print(density_matrix)
+        # get the initial density on a grid
+        density = self._density(self.grid, density_matrix)
+        print('Density')
+        print(density)
+        #calculate the coulomb matrix
+        coulomb = self._coulomb(density_matrix)
+        # calculate the exchange correlation potential
+        XC = self._XC(self.grid, density)
+        # calculate the initial Fock matrix
+        Fock = self._Fock(coulomb, XC)
         energy, KSwave = eigh(Fock, overlap)
         return energy, KSwave
 
@@ -35,24 +67,24 @@ class RKSDFT():
         return density_coeff
 
 
-    def _density(self, grid):
+    def _density(self, grid, density_matrix):
         """calculate the density matrix on a grid
         """
         ao_vals = numint.eval_ao(self.molecule, grid)
-        density, dx, dy, dz = numint.eval_rho(self.molecule, ao_vals, self._density_coeff())
+        #density, dx, dy, dz = numint.eval_rho(self.molecule, ao_vals, density_matrix)
+        density = numint.eval_rho(self.molecule, ao_vals, density_matrix)
         
         return density
 
 
-    def _Fock(self, density_coeff):
+    def _Fock(self, coulomb, XC):
         """calculate the Fock matrix
         F_mu,nu = Hcore_mu,nu + J_mu,nu + XC_mu,nu
         """
         Hcore = self.Hcore
-        coulomb = self._coulomb(density_coeff)
 
-        Fock = np.zeros((self.Nbas, self.Nbas))
         Fock = Hcore + coulomb + XC
+        return Fock
 
     def _coulomb(self, density_coeff):
         """calculate the coulomb matrix
@@ -71,11 +103,14 @@ class RKSDFT():
         """calculate the exchange correlation energy
         """
         # Get the exchange correlation evaluation from libxc
-        libxc = libxc.eval_xc('lda', density)
+        print('Density')
+        print(density.shape)
+        print(density)
+        libxc_return = libxc.eval_xc('lda', density)
         # First return value is the energy per particle
-        epsilon_xc = libxc[0]
+        epsilon_xc = libxc_return[0]
         # Second return value is the first derivative of the energy per particle
-        first_deriv_eps = libxc[1][0]
+        first_deriv_eps = libxc_return[1][0]
         # The exchange correlation potential for LDA gets calculated as follows:
         # V_xc = epsilon_xc + density * d(epsilon_xc)/d(density)
         XC_pot = epsilon_xc + first_deriv_eps*density
