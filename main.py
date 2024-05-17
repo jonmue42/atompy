@@ -12,19 +12,52 @@ from pyscf.dft import numint
 
 #DFT
 
-H20 = gto.M(atom='O 0 0 0; H 0 0 1.809; H 1.809 0 0', basis='sto-3g', unit='Bohr')
+#H20 = gto.M(atom='O 0 0 0; H 0 0 1.809; H 1.809 0 0', basis='sto-3g', unit='Bohr')
+H20 = gto.M(atom='H 0 0 0; H 0 0 1.4', basis='sto-3g', unit='Bohr')
 grid = dft.gen_grid.Grids(H20)
 grid.build(with_non0tab=True)
-print(grid.coords)
-DFT_scf = RKSDFT(H20, grid=grid.coords)
+print('Grid')
+print(grid.weights)
+#grid = np.linspace(-5, 5, 1000)
+#print(grid)
+#print(np.stack((grid, grid, grid), axis=1))
+#print(grid.coords)
+#print(len(grid.coords))
+#print(numint.eval_ao(H20, grid.coords, deriv=0).shape)
+#libxc_return = eval_xc('lda', np.array([0.1, 0.4]))
+#print(libxc_return)
+#print(libxc_return[0] + libxc_return[1] * np.array([0.1, 0.4]))
+
+
+DFT_scf = RKSDFT(H20, grid=grid)
 initial_c = np.zeros((DFT_scf.Nbas, DFT_scf.Nbas))
-DF_energy, DF_KSwave, total_elec_energy = DFT_scf(initial_c=initial_c, tol=1E-6, max_iter=100)
+DF_energy, DF_KSwave, total_elec_energy = DFT_scf(initial_c=initial_c, tol=1E-2, max_iter=10)
+print('Energy')
+print(total_elec_energy)
+print('Total energy')
+print(total_elec_energy + H20.energy_nuc())
+print('mo_energy')
+print(DF_energy)
+print('mo_coeff')
+print(DF_KSwave)
 
 print('######################################################################################################################')
 
 mf = dft.RKS(H20)
 mf.xc = 'LDA'
-mf.kernel()
+res = mf.kernel()
+print(res)
+e_tot = mf.e_tot
+mo_energy = mf.mo_energy
+mo_coeff = mf.mo_coeff
+
+print('total Energy')
+print(e_tot)
+print('mo_energy')
+print(mo_energy)
+print('mo_coeff')
+print(mo_coeff)
+
 
 #grid = dft.gen_grid.Grids(H20)
 

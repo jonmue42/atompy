@@ -8,7 +8,8 @@ from pyscf.dft import numint
 
 class RKSDFT():
     def __init__(self, molecule, grid):
-        self.grid = grid
+        self.grid = grid.coords
+        self.weights = grid.weights
 
         self.molecule = molecule
         self.Nbas = molecule.nao
@@ -21,28 +22,40 @@ class RKSDFT():
 
         self.two_electron = molecule.intor('int2e')
 
+        self.cycle_iter = 0
+
     def __call__(self, initial_c, tol, max_iter):
         # perform a first cycle of scf
         energy, KSwave = self._calculate_cycle(self.overlap, initial_c)
         for iteration in range(max_iter):
             energy_new, KSwave_new = self._calculate_cycle(self.overlap, KSwave)
+            print('total energy: ', self._total_elec_energy(energy_new, self._density_matrix(KSwave_new), self._density(self.grid, self._density_matrix(KSwave_new)), self._coulomb(self._density_matrix(KSwave_new))))
             if np.allclose(energy, energy_new, atol=tol, rtol=0.0) and np.allclose(KSwave, KSwave_new, atol=tol, rtol=0.0):
                 print('Converged')
-                density_matrix = self._density_coeff(KSwave_new)
+                density_matrix = self._density_matrix(KSwave_new)
                 density = self._density(self.grid, density_matrix)
-                Fock = self._Fock(self._coulomb(density_matrix), self._XC(self.grid, density))
-                total_elec_energy = self._total_elec_energy(density_matrix, Fock)
+                coulomb = self._coulomb(density_matrix)
+                total_elec_energy = self._total_elec_energy(energy_new, density_matrix, density, coulomb)
                 return energy_new, KSwave_new, total_elec_energy
             else:
                 energy = energy_new
                 KSwave = KSwave_new
         print('Did not converge')
+        density_matrix = self._density_matrix(KSwave_new)
+        density = self._density(self.grid, density_matrix)
+        coulomb = self._coulomb(density_matrix)
+        total_elec_energy = self._total_elec_energy(energy_new, density_matrix, density, coulomb)
+        return energy_new, KSwave_new, total_elec_energy
+
+
 
     def _calculate_cycle(self, overlap, KSwave):
         """perfrom single cycle of scf
         """
+        print('Calculating cycle: ', self.cycle_iter)
+        self.cycle_iter += 1
         # get the initial density matrix
-        density_matrix = self._density_coeff(KSwave)
+        density_matrix = self._density_matrix(KSwave)
         # get the initial density on a grid
         density = self._density(self.grid, density_matrix)
         #print('Density')
@@ -58,14 +71,17 @@ class RKSDFT():
 
 
 
-    def _density_coeff(self, KSwave):
+    def _density_matrix(self, KSorbs):
         """get the coefficents of the density matrix
         """
         density_coeff = np.zeros((self.Nbas, self.Nbas))
         for i in range(self.Nbas):
             for j in range(self.Nbas):
                 for k in range(int(self.nelectron/2)):
-                    density_coeff[i, j] += 2 * KSwave[i, k] * KSwave[j, k]
+                    #print('nelectron: ', self.nelectron)
+                    #print('electron: ', k)
+                    #print('KSorbs[i, k]', KSorbs)
+                    density_coeff[i, j] += KSorbs[i, k] * KSorbs[j, k]
         return density_coeff
 
 
@@ -74,8 +90,12 @@ class RKSDFT():
         """
         ao_vals = numint.eval_ao(self.molecule, grid)
         #density, dx, dy, dz = numint.eval_rho(self.molecule, ao_vals, density_matrix)
-        density = numint.eval_rho(self.molecule, ao_vals, density_matrix)
-        
+        #density = numint.eval_rho(self.molecule, ao_vals, density_matrix)
+        density = np.zeros(len(grid))
+        for p in range(len(density)):
+            for i in range(self.Nbas):
+                for j in range(self.Nbas):
+                    density[p] += density_matrix[i, j] * ao_vals[p, i] * ao_vals[p, j]
         return density
 
 
@@ -120,18 +140,40 @@ class RKSDFT():
         XC = np.zeros((self.Nbas, self.Nbas))
         for i in range(self.Nbas):
             for j in range(self.Nbas):
-                for k in range(len(grid)):
-                    XC[i, j] += ao_vals[k, i] * XC_pot[k] * ao_vals[k, j]
+                for p in range(len(grid)):
+                    XC[i, j] += ao_vals[p, i] * XC_pot[p] * ao_vals[p, j] * self.weights[p]
         return XC
 
-    def _total_elec_energy(self, density_matrix, Fock):
-        total_elec_energy = 0
+    def _total_elec_energy(self, orbs_energy, density_matrix, density, coulomb):
+        """calculate the total electronic energy given by
+        E = sum_i^N epsilon_i - 0.5 
+        """
+        #initiate total energy with sum of orbital energies
+        total_elec_energy = np.sum(orbs_energy)
+        #add coulomb part to total energy
         for i in range(self.Nbas):
             for j in range(self.Nbas):
-                total_elec_energy += 0.5 * density_matrix[i, j] * (self.Hcore[j, i] + Fock[j, i])
-        print('Fock')
-        print(Fock)
+                #total_elec_energy += -0.5 * density_matrix[i, j] * coulomb[i, j]
+                total_elec_energy += -density_matrix[i, j] * coulomb[i, j]
+        #add exchange correlation part to total energy
+        Exc = self._XCenergy(self.grid, density)
+        total_elec_energy += Exc
+
         return total_elec_energy
+
+    def _XCenergy(self, grid, density):
+        """calculate the exchange correlation energy
+        """
+        libxc_return = libxc.eval_xc('lda', density)
+        epsilon_xc = libxc_return[0]
+
+        first_deriv_eps = libxc_return[1][0]
+        XC_pot = epsilon_xc + first_deriv_eps*density
+
+        Exc = np.sum(epsilon_xc * density * self.weights)
+        #subtract potential term
+        Exc -= np.sum(XC_pot * density * self.weights)
+        return Exc
 
 
     
