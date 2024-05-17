@@ -28,7 +28,11 @@ class RKSDFT():
             energy_new, KSwave_new = self._calculate_cycle(self.overlap, KSwave)
             if np.allclose(energy, energy_new, atol=tol, rtol=0.0) and np.allclose(KSwave, KSwave_new, atol=tol, rtol=0.0):
                 print('Converged')
-                return energy_new, KSwave_new
+                density_matrix = self._density_coeff(KSwave_new)
+                density = self._density(self.grid, density_matrix)
+                Fock = self._Fock(self._coulomb(density_matrix), self._XC(self.grid, density))
+                total_elec_energy = self._total_elec_energy(density_matrix, Fock)
+                return energy_new, KSwave_new, total_elec_energy
             else:
                 energy = energy_new
                 KSwave = KSwave_new
@@ -39,12 +43,10 @@ class RKSDFT():
         """
         # get the initial density matrix
         density_matrix = self._density_coeff(KSwave)
-        print('Density matrix')
-        print(density_matrix)
         # get the initial density on a grid
         density = self._density(self.grid, density_matrix)
-        print('Density')
-        print(density)
+        #print('Density')
+        #print(density)
         #calculate the coulomb matrix
         coulomb = self._coulomb(density_matrix)
         # calculate the exchange correlation potential
@@ -103,9 +105,6 @@ class RKSDFT():
         """calculate the exchange correlation energy
         """
         # Get the exchange correlation evaluation from libxc
-        print('Density')
-        print(density.shape)
-        print(density)
         libxc_return = libxc.eval_xc('lda', density)
         # First return value is the energy per particle
         epsilon_xc = libxc_return[0]
@@ -125,7 +124,14 @@ class RKSDFT():
                     XC[i, j] += ao_vals[k, i] * XC_pot[k] * ao_vals[k, j]
         return XC
 
-
+    def _total_elec_energy(self, density_matrix, Fock):
+        total_elec_energy = 0
+        for i in range(self.Nbas):
+            for j in range(self.Nbas):
+                total_elec_energy += 0.5 * density_matrix[i, j] * (self.Hcore[j, i] + Fock[j, i])
+        print('Fock')
+        print(Fock)
+        return total_elec_energy
 
 
     

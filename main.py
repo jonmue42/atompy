@@ -18,10 +18,15 @@ grid.build(with_non0tab=True)
 print(grid.coords)
 DFT_scf = RKSDFT(H20, grid=grid.coords)
 initial_c = np.zeros((DFT_scf.Nbas, DFT_scf.Nbas))
-DF_energy, DF_KSwave = DFT_scf(initial_c=initial_c, tol=1E-1, max_iter=10)
-print('Energy')
-print(DF_energy)
+DF_energy, DF_KSwave, total_elec_energy = DFT_scf(initial_c=initial_c, tol=1E-6, max_iter=100)
 
+print('######################################################################################################################')
+
+mf = dft.RKS(H20)
+mf.xc = 'LDA'
+mf.kernel()
+
+#grid = dft.gen_grid.Grids(H20)
 
 ##############################################################
 #hartree_fock:
