@@ -13,8 +13,9 @@ from pyscf.dft import numint
 
 #DFT
 
-#H20 = gto.M(atom='O 0 0 0; H 0 0 1.809; H 1.809 0 0', basis='sto-3g', unit='Bohr')
-H20 = gto.M(atom='H 0 0 0; H 0 0 1.4', basis='sto-3g', unit='Bohr')
+H20 = gto.M(atom='O 0 0 0; H 0 0 1.809; H 1.809 0 0', basis='sto-3g', unit='Bohr')
+#H20 = gto.M(atom='H 0 0 0; H 0 0 1.4', basis='sto-3g', unit='Bohr')
+#H20 = gto.M(atom='C 0 0 0; O 0 0 2.166', basis='sto-3g', unit='Bohr')
 grid = dft.gen_grid.Grids(H20)
 grid.build(with_non0tab=True)
 print('Grid')
@@ -32,6 +33,9 @@ print(grid.weights)
 
 DFT_scf = RKSDFT2(H20, grid=grid)
 initial_c = np.zeros((DFT_scf.Nbas, DFT_scf.Nbas))
+mf = dft.RKS(H20)
+mf.xc = 'LDA'
+initial_c = mf.get_init_guess()
 DF_energy, DF_KSwave, total_elec_energy = DFT_scf(initial_c=initial_c, tol=1E-6, max_iter=100)
 print('Energy')
 print(total_elec_energy)
@@ -112,15 +116,18 @@ e_tot = mf.e_tot
 mo_energy = mf.mo_energy
 mo_coeff = mf.mo_coeff
 
+
 print('total Energy')
 print(e_tot)
 print('mo_energy')
 print(mo_energy)
 print('mo_coeff')
 print(mo_coeff)
-total_energy = total_energy(H20, mf, grid)
-print('Total energy')
-print(total_energy)
+print('initial')
+mf.dump_scf_summary()
+#total_energy = total_energy(H20, mf, grid)
+#print('Total energy')
+#print(total_energy)
 
 #grid = dft.gen_grid.Grids(H20)
 

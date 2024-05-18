@@ -78,7 +78,8 @@ class RKSDFT2():
         for i in range(self.Nbas):
             for j in range(self.Nbas):
                 for k in range(int(self.nelectron/2)):
-                    density_coeff[i, j] += KSorbs[i, k] * KSorbs[j, k]
+                    density_coeff[i, j] += 2*KSorbs[i, k] * KSorbs[j, k]
+                    #density_coeff[i, j] += KSorbs[i, k] * KSorbs[j, k]
         return density_coeff
 
 
@@ -110,7 +111,8 @@ class RKSDFT2():
             for j in range(self.Nbas):
                 for k in range(self.Nbas):
                     for l in range(self.Nbas):
-                        coulomb[i, j] += density_coeff[k, l] * self.two_electron[i, j, k, l]
+                        coulomb[i, j] += 0.5*density_coeff[k, l] * self.two_electron[i, j, k, l]
+                        #coulomb[i, j] += density_coeff[k, l] * self.two_electron[i, j, k, l]
         return coulomb
 
 
@@ -119,7 +121,7 @@ class RKSDFT2():
         """calculate the exchange correlation energy
         """
         # Get the exchange correlation evaluation from libxc
-        libxc_return = libxc.eval_xc('lda', density)
+        libxc_return = libxc.eval_xc('LDA', density)
         # First return value is the energy per particle
         epsilon_xc = libxc_return[0]
         # Second return value is the first derivative of the energy per particle
@@ -131,61 +133,70 @@ class RKSDFT2():
         #get the values for the atomic orbitals for each grid point
         ao_vals = numint.eval_ao(self.molecule, grid)
 
-        XC = numint.eval_mat(self.molecule, ao_vals, self.weights, density, first_deriv_eps)
-        print('XC')
-        print(XC)
-        
+        #XC = numint.eval_mat(self.molecule, ao_vals, self.weights, density, first_deriv_eps)
+        XC = numint.eval_mat(self.molecule, ao_vals, self.weights, density, XC_pot)
+        #print('XC')
+        #print(XC)
+        #Equivalent to the the eval_mat function:
+       # XC = np.zeros((self.Nbas, self.Nbas))
+       # for i in range(self.Nbas):
+       #     for j in range(self.Nbas):
+       #         for k in range(len(grid)):
+       #             #print('3333333333333333333333333333')
+       #             #print(ao_vals.shape)
+       #             XC[i, j] += ao_vals[k, i] * ao_vals[k, j] * XC_pot[k] * self.weights[k]
+
         return XC
 
     def _total_elec_energy(self, orbs_energy, density_matrix, density, coulomb):
         """calculate the total electronic energy given by
         E = sum_i^N epsilon_i - 0.5 
         """
-        ##initiate total energy with sum of orbital energies
-        #total_elec_energy = np.sum(orbs_energy)
-        ##add coulomb part to total energy
+        #initiate total energy with sum of orbital energies
+        total_elec_energy = 0
+        #add coulomb part to total energy
+        for i in range(self.Nbas):
+            for j in range(self.Nbas):
+                total_elec_energy += density_matrix[i, j] * coulomb[i, j]
+                total_elec_energy += density_matrix[i, j] * self.Hcore[i, j]
+                #total_elec_energy += density_matrix[i, j] * self._XC(self.grid, density)[i, j]
+        #add exchange correlation part to total energy
+        Exc = self._XCenergy(self.grid, density)
+        total_elec_energy += Exc
+
+        #total_elec_energy += np.sum(orbs_energy) + self._XCenergy(self.grid, density)
         #for i in range(self.Nbas):
         #    for j in range(self.Nbas):
         #        total_elec_energy += -0.5 * density_matrix[i, j] * coulomb[i, j]
-        #        #total_elec_energy += -density_matrix[i, j] * coulomb[i, j]
-        ##add exchange correlation part to total energy
-        #Exc = self._XCenergy(self.grid, density)
-        #total_elec_energy += Exc
-
-        Ts = self._Ts(density_matrix)
-        Eh = self._Eh(density_matrix, coulomb)
-        Exc = self._XCenergy(self.grid, density)
-        total_elec_energy = Ts + Eh + Exc
-
+        one_electron_energy = 0
+        for i in range(self.Nbas):
+            for j in range(self.Nbas):
+                one_electron_energy += density_matrix[i, j] * self.Hcore[i, j]
+        two_electron_coulomb = 0
+        for i in range(self.Nbas):
+            for j in range(self.Nbas):
+                two_electron_coulomb += density_matrix[i, j] * coulomb[i, j]
+        XC_energy = 0
+        for i in range(self.Nbas):
+            for j in range(self.Nbas):
+                XC_energy += density_matrix[i, j] * self._XC(self.grid, density)[i, j]
+        XC_energy = self._XCenergy(self.grid, density)
+        print('***Summary***')
+        print("nuclear energy: ", self.molecule.energy_nuc())
+        print('one electron energy: ', one_electron_energy)
+        print('two electron coulomb energy: ', two_electron_coulomb)
+        print('XC energy: ', XC_energy)
         return total_elec_energy
 
     def _XCenergy(self, grid, density):
         """calculate the exchange correlation energy
         """
-        libxc_return = libxc.eval_xc('lda', density)
+        libxc_return = libxc.eval_xc('LDA', density)
         epsilon_xc = libxc_return[0]
-
         first_deriv_eps = libxc_return[1][0]
         XC_pot = epsilon_xc + first_deriv_eps*density
 
         Exc = np.sum(epsilon_xc * density * self.weights)
-        #subtract potential term
         #Exc -= np.sum(XC_pot * density * self.weights)
         return Exc
 
-    def _Ts(self, density_matrix):
-        Ts = 0
-        for i in range(self.Nbas):
-            for j in range(self.Nbas):
-                Ts += density_matrix[i, j] * self.Hcore[j, i]
-        return Ts
-
-    def _Eh(self, density_matrix, coulomb):
-        Eh = 0
-        for i in range(self.Nbas):
-            for j in range(self.Nbas):
-                Eh += density_matrix[i, j] * coulomb[j, i]
-        return Eh
-
-
-    
