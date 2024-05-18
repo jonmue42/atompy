@@ -6,7 +6,7 @@ from pyscf.dft import numint
 
 #TODO total electronic energy, total energy 
 
-class RKSDFT():
+class RKSDFT2():
     def __init__(self, molecule, grid):
         self.grid = grid.coords
         self.weights = grid.weights
@@ -78,9 +78,6 @@ class RKSDFT():
         for i in range(self.Nbas):
             for j in range(self.Nbas):
                 for k in range(int(self.nelectron/2)):
-                    #print('nelectron: ', self.nelectron)
-                    #print('electron: ', k)
-                    #print('KSorbs[i, k]', KSorbs)
                     density_coeff[i, j] += KSorbs[i, k] * KSorbs[j, k]
         return density_coeff
 
@@ -90,12 +87,9 @@ class RKSDFT():
         """
         ao_vals = numint.eval_ao(self.molecule, grid)
         #density, dx, dy, dz = numint.eval_rho(self.molecule, ao_vals, density_matrix)
-        #density = numint.eval_rho(self.molecule, ao_vals, density_matrix)
-        density = np.zeros(len(grid))
-        for p in range(len(density)):
-            for i in range(self.Nbas):
-                for j in range(self.Nbas):
-                    density[p] += density_matrix[i, j] * ao_vals[p, i] * ao_vals[p, j]
+        density = numint.eval_rho(self.molecule, ao_vals, density_matrix)
+        print('Density')
+        print(density)
         return density
 
 
@@ -137,11 +131,9 @@ class RKSDFT():
         #get the values for the atomic orbitals for each grid point
         ao_vals = numint.eval_ao(self.molecule, grid)
 
-        XC = np.zeros((self.Nbas, self.Nbas))
-        for i in range(self.Nbas):
-            for j in range(self.Nbas):
-                for p in range(len(grid)):
-                    XC[i, j] += ao_vals[p, i] * XC_pot[p] * ao_vals[p, j] * self.weights[p]
+        XC = numint.eval_mat(self.molecule, ao_vals, self.weights, density, first_deriv_eps)
+        print('XC')
+        print(XC)
         
         return XC
 
@@ -149,16 +141,21 @@ class RKSDFT():
         """calculate the total electronic energy given by
         E = sum_i^N epsilon_i - 0.5 
         """
-        #initiate total energy with sum of orbital energies
-        total_elec_energy = np.sum(orbs_energy)
-        #add coulomb part to total energy
-        for i in range(self.Nbas):
-            for j in range(self.Nbas):
-                #total_elec_energy += -0.5 * density_matrix[i, j] * coulomb[i, j]
-                total_elec_energy += -density_matrix[i, j] * coulomb[i, j]
-        #add exchange correlation part to total energy
+        ##initiate total energy with sum of orbital energies
+        #total_elec_energy = np.sum(orbs_energy)
+        ##add coulomb part to total energy
+        #for i in range(self.Nbas):
+        #    for j in range(self.Nbas):
+        #        total_elec_energy += -0.5 * density_matrix[i, j] * coulomb[i, j]
+        #        #total_elec_energy += -density_matrix[i, j] * coulomb[i, j]
+        ##add exchange correlation part to total energy
+        #Exc = self._XCenergy(self.grid, density)
+        #total_elec_energy += Exc
+
+        Ts = self._Ts(density_matrix)
+        Eh = self._Eh(density_matrix, coulomb)
         Exc = self._XCenergy(self.grid, density)
-        total_elec_energy += Exc
+        total_elec_energy = Ts + Eh + Exc
 
         return total_elec_energy
 
@@ -173,8 +170,22 @@ class RKSDFT():
 
         Exc = np.sum(epsilon_xc * density * self.weights)
         #subtract potential term
-        Exc -= np.sum(XC_pot * density * self.weights)
+        #Exc -= np.sum(XC_pot * density * self.weights)
         return Exc
+
+    def _Ts(self, density_matrix):
+        Ts = 0
+        for i in range(self.Nbas):
+            for j in range(self.Nbas):
+                Ts += density_matrix[i, j] * self.Hcore[j, i]
+        return Ts
+
+    def _Eh(self, density_matrix, coulomb):
+        Eh = 0
+        for i in range(self.Nbas):
+            for j in range(self.Nbas):
+                Eh += density_matrix[i, j] * coulomb[j, i]
+        return Eh
 
 
     

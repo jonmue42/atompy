@@ -2,6 +2,7 @@ from basis_sets.gaussian import GaussianBasis
 from structure import atom, molecule
 from hartree_fock.scf import RHF
 from dft.scf import RKSDFT
+from dft.scf2 import RKSDFT2
 import typing
 import numpy as np 
 
@@ -29,9 +30,9 @@ print(grid.weights)
 #print(libxc_return[0] + libxc_return[1] * np.array([0.1, 0.4]))
 
 
-DFT_scf = RKSDFT(H20, grid=grid)
+DFT_scf = RKSDFT2(H20, grid=grid)
 initial_c = np.zeros((DFT_scf.Nbas, DFT_scf.Nbas))
-DF_energy, DF_KSwave, total_elec_energy = DFT_scf(initial_c=initial_c, tol=1E-2, max_iter=10)
+DF_energy, DF_KSwave, total_elec_energy = DFT_scf(initial_c=initial_c, tol=1E-6, max_iter=100)
 print('Energy')
 print(total_elec_energy)
 print('Total energy')
@@ -42,6 +43,66 @@ print('mo_coeff')
 print(DF_KSwave)
 
 print('######################################################################################################################')
+
+def density_matrix_func(molecule, mf):
+    Nbas = molecule.nao
+    nelectron = molecule.nelectron
+    density_matrix = np.zeros((Nbas, Nbas))
+    for i in range(Nbas):
+        for j in range(Nbas):
+                for k in range(int(nelectron/2)):
+                    density_matrix[i, j] += mf.mo_coeff[i, k] * mf.mo_coeff[j, k] 
+    return density_matrix
+
+def density_func(molecule, grid, density_matrix):
+    weights = grid.weights
+    grid = grid.coords
+    Nbas = molecule.nao
+    
+    ao_vals = numint.eval_ao(molecule, grid, deriv=0)
+    density = numint.eval_rho(molecule, ao_vals, density_matrix)
+    return density
+
+def coulomb(molecule, density_matrix):
+    Nbas = molecule.nao
+    two_electron = molecule.intor('int2e')
+    coulomb = np.zeros((Nbas, Nbas))
+    for i in range(Nbas):
+        for j in range(Nbas):
+            for k in range(Nbas):
+                for l in range(Nbas):
+                    coulomb[i, j] += density_matrix[k, l] * two_electron[i, j, k, l]
+    return coulomb
+
+def XCenergy(molecule, grid, density):
+    weights = grid.weights
+    grid = grid.coords
+    XC = eval_xc('LDA', density)
+    epsilon = XC[0]
+    first_derivative = XC[1][0]
+    XC_pot = epsilon + first_derivative * density
+    print('XC_pot')
+    print(XC_pot)
+    Exc = np.sum(epsilon * weights * density)
+    Exc -= np.sum(XC_pot * weights * density)
+    return Exc
+
+def total_energy(molecule, mf, grid):
+    density_matrix = density_matrix_func(molecule, mf)
+    density = density_func(molecule, grid, density_matrix)
+    coulomb_matrix = coulomb(molecule, density_matrix)
+    Exc = XCenergy(molecule, grid, density)
+
+    total_energy = np.sum(mf.mo_energy) 
+    for i in range(molecule.nao):
+        for j in range(molecule.nao):
+            total_energy += -0.5 * density_matrix[i, j] * coulomb_matrix[i, j]
+    print('Exc')
+    print(Exc)
+    total_energy += Exc
+
+    return total_energy
+
 
 mf = dft.RKS(H20)
 mf.xc = 'LDA'
@@ -57,7 +118,9 @@ print('mo_energy')
 print(mo_energy)
 print('mo_coeff')
 print(mo_coeff)
-
+total_energy = total_energy(H20, mf, grid)
+print('Total energy')
+print(total_energy)
 
 #grid = dft.gen_grid.Grids(H20)
 
